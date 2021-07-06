@@ -1,0 +1,115 @@
+    //URL to Github repository https://github.com/<owner>/<repo>
+    def GITHUB_REPO_URL="https://github.com/dmunoz166/docker_book"
+    def GITHUB_BRANCH="master"
+    
+    //Retrieve ENV ID values for QA from "Download attributes from API" json file
+    def VELOCITY_ENV_ID_QA="1b0467e4-28fb-4f82-8d66-2c2788354d5b"
+    
+
+    //VELOCITY_APP_NAME must match your Velocity pipeline application name
+    def VELOCITY_APP_NAME="Docker App1"
+
+    //Do not change below this line.
+    def GIT_COMMIT
+
+    // Testing Issue name on revision value
+    def ISSUE_JIRA="DCB-1"
+pipeline {
+    agent any
+    tools {
+        maven 'Maven-Jenkins' 
+    }
+    environment {
+        DOCKER_HUB = credentials('Docker_Hub')
+    }
+
+    stages {
+        stage ('cloning the repository') {
+            steps {
+                script {
+                    currentBuild.displayName = "2.1.1.${BUILD_NUMBER}"
+                    majorVersion="${BUILD_NUMBER}"
+                    def scm = git branch: "${GITHUB_BRANCH}", url: "${GITHUB_REPO_URL}"
+                    echo "${scm}"
+                    GIT_COMMIT = sh(returnStdout: true, script: "git rev-parse HEAD").trim()
+                    echo "GIT_COMMIT=${GIT_COMMIT}"
+                }
+            }
+        }
+        stage('Build-maven') {
+            steps {
+                // Get some code from a GitHub repository
+                git 'https://github.com/dmunoz166/docker_book'
+
+                // Run Maven on a Unix agent.
+                sh "mvn clean compile package -Dmaven.test.skip=true"
+
+                // To run Maven on a Windows agent, use
+                // bat "mvn -Dmaven.test.failure.ignore=true clean package"
+            }
+
+            post {
+                // If Maven was able to run the tests, even if some of the test
+                // failed, record the test results and archive the jar file.
+                success {
+                    archiveArtifacts 'target/*.jar'
+                }
+            }
+        }
+        stage('Análisis de código'){
+            steps{
+                sh "mvn sonar:sonar"
+            }
+        }
+        stage('Construcción de imagen'){
+            steps{
+                sh 'echo "Login DockerHub"'
+                sh ("docker login --username $DOCKER_HUB_USR --password $DOCKER_HUB_PSW")
+                sh 'echo "Construyendo Imagen App"'
+                sh 'docker build -t kattyleja/docker_book:1 .'
+                sh 'docker push kattyleja/docker_book:1'
+                sh 'echo "Construyendo Imagen DB"'
+                sh "docker build -t kattyleja/docker_db:1 ./db/"
+                sh "docker push kattyleja/docker_db:1"
+            }
+        }
+          // Comentando el build en ucv
+/*        stage ("Build") {
+            steps {
+                echo "Building ${VELOCITY_APP_NAME} (Build:${currentBuild.displayName}, GIT_COMMIT:${GIT_COMMIT})"
+                step($class: 'UploadBuild', 
+                    tenantId: "5ade13625558f2c6688d15ce",
+                    revision: "${ISSUE_JIRA}",
+                    appName: "${VELOCITY_APP_NAME}",
+                    versionName:"${currentBuild.displayName}",
+                    requestor: "admin", id: "${currentBuild.displayName}"
+        )
+            }
+        }*/
+        stage ("Deploy to QA") {
+            steps {
+                sleep 10
+                step([$class: 'UploadDeployment',
+                tenantId: "5ade13625558f2c6688d15ce",
+                versionName: "${currentBuild.displayName}",
+                versionExtId: "${currentBuild.displayName}",
+                type: 'Jenkins',
+                environmentId: "${VELOCITY_ENV_ID_QA}",
+                environmentName: 'QA',
+                appName: "${VELOCITY_APP_NAME}",
+                description: '[Despliegue al ambiente de QA por Jenkins]',
+                initiator: "admin",
+                result: 'true'
+            ])
+            }            
+        }
+
+        stage('Despliegue K8S'){
+            steps{
+                sh 'echo "Desplegando Clúster K8S 3HTP"'
+                sh 'export KUBECONFIG=/home/jenkins/config && kubectl apply -f ./manifiestos/ && kubectl get po -n jenkins'
+            }
+        }
+    }
+}
+

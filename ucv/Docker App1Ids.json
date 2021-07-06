@@ -1,0 +1,28 @@
+{
+  "pipelineId": "1fa1fa45-5390-4c9b-b971-f695a9bd554c",
+  "tenantId": "5ade13625558f2c6688d15ce",
+  "environments": [
+    {
+      "name": "Input",
+      "id": "a3777691-8261-424b-9dcf-82ba4c4473ef"
+    },
+    {
+      "name": "DEV",
+      "id": "40261b90-400f-477f-97d2-b59998797fc8"
+    },
+    {
+      "name": "QA",
+      "id": "1b0467e4-28fb-4f82-8d66-2c2788354d5b"
+    },
+    {
+      "name": "PROD",
+      "id": "8afb71d4-b1d7-45a1-be96-76625d95df56"
+    }
+  ],
+  "applications": [
+    {
+      "name": "docker-book",
+      "id": "90b12359-e16c-423d-89d0-10c5955f2656"
+    }
+  ]
+}
